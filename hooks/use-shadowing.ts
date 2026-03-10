@@ -56,6 +56,7 @@ export const useShadowing = () => {
     utterance.onend = () => {
       setIsPlaying(false);
       setCurrentWordIndex(-1);
+      currentCharIndexRef.current = 0;
     };
     
     utteranceRef.current = utterance;
@@ -77,6 +78,7 @@ export const useShadowing = () => {
     window.speechSynthesis.cancel();
     setIsPlaying(false);
     setCurrentWordIndex(0);
+    currentCharIndexRef.current = 0;
   };
 
   return {
