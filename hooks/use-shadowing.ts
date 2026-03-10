@@ -28,10 +28,10 @@ export const useShadowing = () => {
   }, []);
 
   useEffect(() => {
-    if (utteranceRef.current) {
-      utteranceRef.current.rate = speed;
+    if (isPlaying) {
+      handleStart(currentCharIndexRef.current);
     }
-  }, [speed]);
+  }, [voice, speed]);
 
   const handleStart = (startIndex = 0) => {
     if (!text) return;
