@@ -33,11 +33,12 @@ export const useShadowing = () => {
     }
   }, [speed]);
 
-  const handleStart = () => {
+  const handleStart = (startIndex = 0) => {
     if (!text) return;
     window.speechSynthesis.cancel();
     
-    const utterance = new SpeechSynthesisUtterance(text);
+    const remainingText = text.substring(startIndex);
+    const utterance = new SpeechSynthesisUtterance(remainingText);
     if (voice) {
       utterance.voice = voice;
     }
@@ -45,9 +46,9 @@ export const useShadowing = () => {
     
     utterance.onboundary = (event) => {
       if (event.name === 'word') {
-        currentCharIndexRef.current = event.charIndex; // Store current position
-        const charIndex = event.charIndex;
-        const wordsBefore = text.substring(0, charIndex).trim().split(/\s+/);
+        const absoluteCharIndex = startIndex + event.charIndex;
+        currentCharIndexRef.current = absoluteCharIndex; // Store current position
+        const wordsBefore = text.substring(0, absoluteCharIndex).trim().split(/\s+/);
         setCurrentWordIndex(wordsBefore.length === 1 && wordsBefore[0] === '' ? 0 : wordsBefore.length);
       }
     };
