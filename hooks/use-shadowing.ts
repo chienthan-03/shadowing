@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useHotkeys } from 'react-hotkeys-hook';
 
 export const useShadowing = () => {
   const [text, setText] = useState('');
@@ -98,6 +99,18 @@ export const useShadowing = () => {
     setCurrentWordIndex(0);
     currentCharIndexRef.current = 0;
   };
+
+  useHotkeys('shift+enter', () => {
+    if (text && !isPlaying) handleStart();
+  }, { enableOnFormTags: false });
+
+  useHotkeys('shift+space', () => {
+    handlePauseResume();
+  }, { enableOnFormTags: false });
+
+  useHotkeys('shift+w', () => {
+    handleStop();
+  }, { enableOnFormTags: false });
 
   return {
     text,

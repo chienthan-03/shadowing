@@ -82,7 +82,15 @@ export default function ShadowingPage() {
         {text && (
           <Card>
             <CardHeader>
-              <CardTitle>Reader</CardTitle>
+              <CardTitle>
+                <div className="flex justify-between items-center">
+                  <span>Reader {currentWordIndex + 1} / {words.length}</span>
+                  <Button variant="outline" onClick={handlePauseResume} disabled={!isPlaying && window.speechSynthesis.paused === false && currentWordIndex === -1}>
+                    {isPlaying ? <Pause className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
+                    {isPlaying ? 'Pause' : 'Resume'}
+                  </Button>
+                </div>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-xl leading-relaxed p-4 bg-muted rounded-lg mb-4">
@@ -98,15 +106,6 @@ export default function ShadowingPage() {
                     {word}
                   </span>
                 ))}
-              </div>
-              <div className="flex gap-4 justify-center">
-                <Button variant="outline" onClick={handlePauseResume} disabled={!isPlaying && window.speechSynthesis.paused === false && currentWordIndex === -1}>
-                  {isPlaying ? <Pause className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
-                  {isPlaying ? 'Pause' : 'Resume'}
-                </Button>
-                <Button variant="destructive" onClick={handleStop}>
-                  <Square className="mr-2 h-4 w-4" /> Stop
-                </Button>
               </div>
             </CardContent>
           </Card>
