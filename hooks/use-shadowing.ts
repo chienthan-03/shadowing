@@ -49,11 +49,28 @@ export const useShadowing = () => {
         const absoluteCharIndex = startIndex + event.charIndex;
         currentCharIndexRef.current = absoluteCharIndex; // Store current position
         
-        // Calculate word index by counting how many words start before this character index
-        // We must use the exact same logic as in the UI (page.tsx) to split words
-        const textBefore = text.substring(0, absoluteCharIndex);
-        const wordsBefore = textBefore.split(/\s+/).filter(w => w.length > 0);
-        setCurrentWordIndex(wordsBefore.length);
+        // Find which word index this absoluteCharIndex belongs to
+        let charCount = 0;
+        const words = text.split(/\s+/).filter(w => w.length > 0);
+        let foundIndex = -1;
+        
+        // Re-construct the text to find the start index of each word
+        let currentPos = 0;
+        for (let i = 0; i < words.length; i++) {
+          const word = words[i];
+          const wordStart = text.indexOf(word, currentPos);
+          if (wordStart !== -1) {
+            // If the boundary is at or after this word's start, it might be this word
+            if (absoluteCharIndex >= wordStart) {
+              foundIndex = i;
+            }
+            currentPos = wordStart + word.length;
+          }
+        }
+        
+        if (foundIndex !== -1) {
+          setCurrentWordIndex(foundIndex);
+        }
       }
     };
     
