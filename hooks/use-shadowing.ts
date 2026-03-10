@@ -9,6 +9,7 @@ export const useShadowing = () => {
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const currentCharIndexRef = useRef(0);
 
   useEffect(() => {
     const loadVoices = () => {
@@ -26,6 +27,12 @@ export const useShadowing = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (utteranceRef.current) {
+      utteranceRef.current.rate = speed;
+    }
+  }, [speed]);
+
   const handleStart = () => {
     if (!text) return;
     window.speechSynthesis.cancel();
@@ -38,6 +45,7 @@ export const useShadowing = () => {
     
     utterance.onboundary = (event) => {
       if (event.name === 'word') {
+        currentCharIndexRef.current = event.charIndex; // Store current position
         const charIndex = event.charIndex;
         const wordsBefore = text.substring(0, charIndex).trim().split(/\s+/);
         setCurrentWordIndex(wordsBefore.length === 1 && wordsBefore[0] === '' ? 0 : wordsBefore.length);
@@ -67,7 +75,7 @@ export const useShadowing = () => {
   const handleStop = () => {
     window.speechSynthesis.cancel();
     setIsPlaying(false);
-    setCurrentWordIndex(-1);
+    setCurrentWordIndex(0);
   };
 
   return {
