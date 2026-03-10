@@ -48,8 +48,11 @@ export const useShadowing = () => {
       if (event.name === 'word') {
         const absoluteCharIndex = startIndex + event.charIndex;
         currentCharIndexRef.current = absoluteCharIndex; // Store current position
-        const wordsBefore = text.substring(0, absoluteCharIndex).trim().split(/\s+/);
-        setCurrentWordIndex(wordsBefore.length === 1 && wordsBefore[0] === '' ? 0 : wordsBefore.length);
+        
+        // Calculate word index by counting how many words start before this character index
+        const textBefore = text.substring(0, absoluteCharIndex);
+        const wordsBefore = textBefore.trim() === '' ? [] : textBefore.trim().split(/\s+/);
+        setCurrentWordIndex(wordsBefore.length);
       }
     };
     
