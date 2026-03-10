@@ -31,13 +31,15 @@ export const useShadowing = () => {
     if (isPlaying) {
       handleStart(currentCharIndexRef.current);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voice, speed]);
 
   const handleStart = (startIndex = 0) => {
     if (!text) return;
+    const safeStartIndex = typeof startIndex === 'number' && !isNaN(startIndex) ? startIndex : 0;
     window.speechSynthesis.cancel();
     
-    const remainingText = text.substring(startIndex);
+    const remainingText = text.substring(safeStartIndex);
     const utterance = new SpeechSynthesisUtterance(remainingText);
     if (voice) {
       utterance.voice = voice;
@@ -46,25 +48,20 @@ export const useShadowing = () => {
     
     utterance.onboundary = (event) => {
       if (event.name === 'word') {
-        const absoluteCharIndex = startIndex + event.charIndex;
-        currentCharIndexRef.current = absoluteCharIndex; // Store current position
+        const absoluteCharIndex = safeStartIndex + event.charIndex;
+        currentCharIndexRef.current = absoluteCharIndex;
         
-        // Find which word index this absoluteCharIndex belongs to
-        let charCount = 0;
-        const words = text.split(/\s+/).filter(w => w.length > 0);
+        const allWords = text.split(/\s+/).filter(w => w.length > 0);
         let foundIndex = -1;
-        
-        // Re-construct the text to find the start index of each word
         let currentPos = 0;
-        for (let i = 0; i < words.length; i++) {
-          const word = words[i];
-          const wordStart = text.indexOf(word, currentPos);
+        
+        for (let i = 0; i < allWords.length; i++) {
+          const wordStart = text.indexOf(allWords[i], currentPos);
           if (wordStart !== -1) {
-            // If the boundary is at or after this word's start, it might be this word
             if (absoluteCharIndex >= wordStart) {
               foundIndex = i;
             }
-            currentPos = wordStart + word.length;
+            currentPos = wordStart + allWords[i].length;
           }
         }
         

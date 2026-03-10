@@ -41,7 +41,7 @@ export default function ShadowingPage() {
               placeholder="Enter your text here for shadowing..."
               value={text}
               onChange={(e) => setText(e.target.value)}
-              className="min-h-[200px] mb-4"
+              className="min-h-[200px] max-h-[400px] overflow-y-auto mb-4"
             />
             <div className="flex flex-wrap gap-4 items-end">
               <div className="flex-1 min-w-[200px]">
@@ -69,10 +69,10 @@ export default function ShadowingPage() {
                   min={0.5}
                   max={2}
                   step={0.1}
-                  onValueChange={([val]) => setSpeed(val)}
+                  onValueChange={(val) => setSpeed(Array.isArray(val) ? val[0] : val)}
                 />
               </div>
-              <Button onClick={handleStart} disabled={!text || isPlaying}>
+              <Button onClick={() => handleStart()} disabled={!text || isPlaying}>
                 <Play className="mr-2 h-4 w-4" /> Start
               </Button>
             </div>
