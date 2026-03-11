@@ -1,27 +1,6 @@
+import { buildWordTimings, isRemoteVoice } from '@/lib/timmingVoice';
 import { useState, useRef, useEffect } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-
-// Tuned for Google TTS at rate=1 (~150 WPM average)
-const MS_PER_CHAR_BASE = 58;
-// Network latency before Google voice starts producing audio
-const REMOTE_VOICE_INIT_DELAY = 350;
-
-const isRemoteVoice = (v: SpeechSynthesisVoice | null): boolean =>
-  v !== null && !v.localService;
-
-/**
- * Pre-compute when each word should be highlighted.
- * Returns an array of timestamps (ms from speech start) indexed by word position.
- */
-const buildWordTimings = (words: string[], rate: number): number[] => {
-  const timings: number[] = [];
-  let t = REMOTE_VOICE_INIT_DELAY;
-  for (const word of words) {
-    timings.push(t);
-    t += Math.max(80, (word.length + 1) * MS_PER_CHAR_BASE) / rate;
-  }
-  return timings;
-};
 
 export const useShadowing = () => {
   const [text, setText] = useState('');
