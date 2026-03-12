@@ -7,7 +7,7 @@ import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Play, Pause, Square } from 'lucide-react';
+import { Play, Pause } from 'lucide-react';
 
 export default function ShadowingPage() {
   const {
@@ -22,8 +22,8 @@ export default function ShadowingPage() {
     voices,
     handleStart,
     handlePauseResume,
-    handleStop,
     isSupported,
+    isInitializing,
     isPaused,
   } = useShadowing();
 
@@ -39,7 +39,7 @@ export default function ShadowingPage() {
             <CardTitle>Input Text</CardTitle>
           </CardHeader>
           <CardContent>
-            { !isSupported && (
+            { !isInitializing && !isSupported && (
               <div className="bg-destructive/10 text-destructive p-4 rounded-md mb-4">
                 Your browser does not support speech synthesis. Please try Chrome or Safari.
               </div>

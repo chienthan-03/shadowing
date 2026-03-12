@@ -10,6 +10,7 @@ export const useShadowing = () => {
   const [voice, setVoice] = useState<SpeechSynthesisVoice | null>(null);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [isSupported, setIsSupported] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const [isPaused, setIsPaused] = useState(false);
 
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
@@ -63,29 +64,48 @@ export const useShadowing = () => {
   };
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      setIsSupported(true);
-    }
+    const checkSupport = () => {
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        setIsSupported(true);
+        return true;
+      }
+      setIsSupported(false);
+      setIsInitializing(false);
+      return false;
+    };
 
     const loadVoices = () => {
-      if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+      if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+        setIsInitializing(false);
+        return;
+      }
       const available = window.speechSynthesis.getVoices();
       setVoices(available);
       const defaultVoice = available.find(v => v.lang.startsWith('en')) ?? available[0] ?? null;
       setVoice(defaultVoice);
-    };
-
-    loadVoices();
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.onvoiceschanged = loadVoices;
-    }
-
-    return () => {
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        window.speechSynthesis.onvoiceschanged = null;
+      
+      if (available.length > 0) {
+        setIsInitializing(false);
       }
-      clearTimer();
     };
+
+    if (checkSupport()) {
+      loadVoices();
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+
+      // Fallback in case onvoiceschanged never fires or voices list is empty
+      const timeout = setTimeout(() => {
+        setIsInitializing(false);
+      }, 1500);
+
+      return () => {
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+          window.speechSynthesis.onvoiceschanged = null;
+        }
+        clearTimeout(timeout);
+        clearTimer();
+      };
+    }
   }, []);
 
   useEffect(() => {
@@ -235,6 +255,7 @@ export const useShadowing = () => {
     setVoice,
     voices,
     isSupported,
+    isInitializing,
     isPaused,
     handleStart,
     handlePauseResume,
