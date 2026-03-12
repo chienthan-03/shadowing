@@ -7,24 +7,35 @@ import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { Play, Pause } from 'lucide-react';
+import { Play, Square, Mic, MicOff, Trash2 } from 'lucide-react';
+
+const AZURE_VOICES = [
+  { name: 'Ava (Multilingual)', value: 'en-US-AvaMultilingualNeural' },
+  { name: 'Andrew (Multilingual)', value: 'en-US-AndrewMultilingualNeural' },
+  { name: 'Emma (Multilingual)', value: 'en-US-EmmaMultilingualNeural' },
+  { name: 'Brian (Multilingual)', value: 'en-US-BrianMultilingualNeural' },
+];
 
 export default function ShadowingPage() {
   const {
     text,
     setText,
     isPlaying,
+    isListening,
+    recognizedText,
+    interimText,
     currentWordIndex,
     speed,
     setSpeed,
     voice,
     setVoice,
-    voices,
     handleStart,
-    handlePauseResume,
+    handleStop,
+    handleToggleListening,
+    setRecognizedText,
     isSupported,
     isInitializing,
-    isPaused,
+    error,
   } = useShadowing();
 
   const words = text.split(/\s+/).filter(w => w.length > 0);
@@ -39,9 +50,9 @@ export default function ShadowingPage() {
             <CardTitle>Input Text</CardTitle>
           </CardHeader>
           <CardContent>
-            { !isInitializing && !isSupported && (
+            {error && (
               <div className="bg-destructive/10 text-destructive p-4 rounded-md mb-4">
-                Your browser does not support speech synthesis. Please try Chrome or Safari.
+                {error}
               </div>
             )}
             <Textarea
@@ -52,18 +63,18 @@ export default function ShadowingPage() {
             />
             <div className="flex flex-wrap gap-4 items-end">
               <div className="flex-1 min-w-[200px]">
-                <Label>Voice</Label>
+                <Label>Azure Voice</Label>
                 <Select
-                  value={voice?.name || ''}
-                  onValueChange={(name) => setVoice(voices.find(v => v.name === name) || null)}
+                  value={voice}
+                  onValueChange={(val) => setVoice(val ?? '')}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select a voice" />
                   </SelectTrigger>
                   <SelectContent>
-                    {voices.map((v) => (
-                      <SelectItem key={v.name} value={v.name}>
-                        {v.name} ({v.lang})
+                    {AZURE_VOICES.map((v) => (
+                      <SelectItem key={v.value} value={v.value}>
+                        {v.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -79,9 +90,17 @@ export default function ShadowingPage() {
                   onValueChange={(val) => setSpeed(Array.isArray(val) ? val[0] : val)}
                 />
               </div>
-              <Button onClick={() => handleStart()} disabled={!text || isPlaying || !isSupported}>
-                <Play className="mr-2 h-4 w-4" /> Start
-              </Button>
+              <div className="flex gap-2">
+                {!isPlaying ? (
+                  <Button onClick={handleStart} disabled={!text}>
+                    <Play className="mr-2 h-4 w-4" /> Start
+                  </Button>
+                ) : (
+                  <Button variant="destructive" onClick={handleStop}>
+                    <Square className="mr-2 h-4 w-4" /> Stop
+                  </Button>
+                )}
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -92,10 +111,15 @@ export default function ShadowingPage() {
               <CardTitle>
                 <div className="flex justify-between items-center">
                   <span>Reader {currentWordIndex + 1} / {words.length}</span>
-                  <Button variant="outline" onClick={handlePauseResume} disabled={!isPlaying && !isPaused && currentWordIndex === -1}>
-                    {isPlaying ? <Pause className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
-                    {isPlaying ? 'Pause' : 'Resume'}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant={isListening ? "destructive" : "default"} 
+                      onClick={handleToggleListening}
+                    >
+                      {isListening ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4" />}
+                      {isListening ? 'Stop Shadowing' : 'Start Shadowing'}
+                    </Button>
+                  </div>
                 </div>
               </CardTitle>
             </CardHeader>
@@ -114,6 +138,21 @@ export default function ShadowingPage() {
                   </span>
                 ))}
               </div>
+
+              {(recognizedText || interimText) && (
+                <div className="mt-4 p-4 border rounded-lg bg-background">
+                  <div className="flex justify-between items-center mb-2">
+                    <Label className="text-muted-foreground">Shadowing Transcript</Label>
+                    <Button variant="ghost" size="sm" onClick={() => setRecognizedText('')}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <p className="text-lg italic">
+                    {recognizedText}
+                    <span className="text-muted-foreground">{interimText}</span>
+                  </p>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
