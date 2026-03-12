@@ -189,15 +189,15 @@ export const useShadowing = () => {
     pausedElapsedRef.current = 0;
   };
 
-  useHotkeys('shift+enter', () => {
+  useHotkeys('enter', () => {
     if (text && !isPlaying) handleStart();
   }, { enableOnFormTags: false });
 
-  useHotkeys('shift+space', () => {
+  useHotkeys('space', () => {
     handlePauseResume();
   }, { enableOnFormTags: false });
 
-  useHotkeys('shift+w', () => {
+  useHotkeys('w', () => {
     handleStop();
   }, { enableOnFormTags: false });
 
