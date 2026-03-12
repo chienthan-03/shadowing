@@ -85,10 +85,6 @@ export default function ShadowingPage() {
               <CardTitle>
                 <div className="flex justify-between items-center">
                   <span>Reader {currentWordIndex + 1} / {words.length}</span>
-                  <Button variant="outline" onClick={handlePauseResume} disabled={!isPlaying && window.speechSynthesis.paused === false && currentWordIndex === -1}>
-                    {isPlaying ? <Pause className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
-                    {isPlaying ? 'Pause' : 'Resume'}
-                  </Button>
                 </div>
               </CardTitle>
             </CardHeader>
