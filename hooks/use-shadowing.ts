@@ -9,6 +9,8 @@ export const useShadowing = () => {
   const [speed, setSpeed] = useState(1);
   const [voice, setVoice] = useState<SpeechSynthesisVoice | null>(null);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [isSupported, setIsSupported] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
 
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const currentCharIndexRef = useRef(0);
@@ -61,7 +63,12 @@ export const useShadowing = () => {
   };
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      setIsSupported(true);
+    }
+
     const loadVoices = () => {
+      if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
       const available = window.speechSynthesis.getVoices();
       setVoices(available);
       const defaultVoice = available.find(v => v.lang.startsWith('en')) ?? available[0] ?? null;
@@ -69,10 +76,14 @@ export const useShadowing = () => {
     };
 
     loadVoices();
-    window.speechSynthesis.onvoiceschanged = loadVoices;
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
 
     return () => {
-      window.speechSynthesis.onvoiceschanged = null;
+      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+        window.speechSynthesis.onvoiceschanged = null;
+      }
       clearTimer();
     };
   }, []);
@@ -83,11 +94,12 @@ export const useShadowing = () => {
   }, [voice, speed]);
 
   const handleStart = (startIndex = 0) => {
-    if (!text) return;
+    if (!text || !isSupported) return;
     clearTimer();
 
     const safeStart = typeof startIndex === 'number' && !isNaN(startIndex) ? startIndex : 0;
     window.speechSynthesis.cancel();
+    setIsPaused(false);
 
     const words = text.split(/\s+/).filter(w => w.length > 0);
 
@@ -149,6 +161,7 @@ export const useShadowing = () => {
     utterance.onend = () => {
       clearTimer();
       setIsPlaying(false);
+      setIsPaused(false);
       setCurrentWordIndex(-1);
       currentCharIndexRef.current = 0;
       pausedElapsedRef.current = 0;
@@ -159,7 +172,11 @@ export const useShadowing = () => {
       if (e.error === 'interrupted') return;
       clearTimer();
       setIsPlaying(false);
+      setIsPaused(false);
     };
+
+    utterance.onpause = () => setIsPaused(true);
+    utterance.onresume = () => setIsPaused(false);
 
     utteranceRef.current = utterance;
     window.speechSynthesis.speak(utterance);
@@ -167,9 +184,12 @@ export const useShadowing = () => {
   };
 
   const handlePauseResume = () => {
+    if (!isSupported) return;
+    
     if (window.speechSynthesis.paused) {
       window.speechSynthesis.resume();
       setIsPlaying(true);
+      setIsPaused(false);
       if (usingTimerRef.current) runTimer(pausedElapsedRef.current);
     } else {
       // Snapshot elapsed before stopping the timer
@@ -177,13 +197,16 @@ export const useShadowing = () => {
       clearTimer();
       window.speechSynthesis.pause();
       setIsPlaying(false);
+      setIsPaused(true);
     }
   };
 
   const handleStop = () => {
+    if (!isSupported) return;
     clearTimer();
     window.speechSynthesis.cancel();
     setIsPlaying(false);
+    setIsPaused(false);
     setCurrentWordIndex(0);
     currentCharIndexRef.current = 0;
     pausedElapsedRef.current = 0;
@@ -211,6 +234,8 @@ export const useShadowing = () => {
     voice,
     setVoice,
     voices,
+    isSupported,
+    isPaused,
     handleStart,
     handlePauseResume,
     handleStop,

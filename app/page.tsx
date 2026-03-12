@@ -23,6 +23,8 @@ export default function ShadowingPage() {
     handleStart,
     handlePauseResume,
     handleStop,
+    isSupported,
+    isPaused,
   } = useShadowing();
 
   const words = text.split(/\s+/).filter(w => w.length > 0);
@@ -37,6 +39,11 @@ export default function ShadowingPage() {
             <CardTitle>Input Text</CardTitle>
           </CardHeader>
           <CardContent>
+            { !isSupported && (
+              <div className="bg-destructive/10 text-destructive p-4 rounded-md mb-4">
+                Your browser does not support speech synthesis. Please try Chrome or Safari.
+              </div>
+            )}
             <Textarea
               placeholder="Enter your text here for shadowing..."
               value={text}
@@ -72,7 +79,7 @@ export default function ShadowingPage() {
                   onValueChange={(val) => setSpeed(Array.isArray(val) ? val[0] : val)}
                 />
               </div>
-              <Button onClick={() => handleStart()} disabled={!text || isPlaying}>
+              <Button onClick={() => handleStart()} disabled={!text || isPlaying || !isSupported}>
                 <Play className="mr-2 h-4 w-4" /> Start
               </Button>
             </div>
@@ -85,6 +92,10 @@ export default function ShadowingPage() {
               <CardTitle>
                 <div className="flex justify-between items-center">
                   <span>Reader {currentWordIndex + 1} / {words.length}</span>
+                  <Button variant="outline" onClick={handlePauseResume} disabled={!isPlaying && !isPaused && currentWordIndex === -1}>
+                    {isPlaying ? <Pause className="mr-2 h-4 w-4" /> : <Play className="mr-2 h-4 w-4" />}
+                    {isPlaying ? 'Pause' : 'Resume'}
+                  </Button>
                 </div>
               </CardTitle>
             </CardHeader>
