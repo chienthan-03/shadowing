@@ -1,176 +1,194 @@
-import { useState, useEffect } from 'react';
+import { buildWordTimings, isRemoteVoice } from '@/lib/timmingVoice';
+import { useState, useRef, useEffect } from 'react';
 import { useHotkeys } from 'react-hotkeys-hook';
-import { useSpeech } from 'react-text-to-speech';
 
 export const useShadowing = () => {
   const [text, setText] = useState('');
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentWordIndex, setCurrentWordIndex] = useState(-1);
   const [speed, setSpeed] = useState(1);
   const [voice, setVoice] = useState<SpeechSynthesisVoice | null>(null);
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
-  const [isSupported, setIsSupported] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
-  const [isPaused, setIsPaused] = useState(false);
-  const [currentWordIndex, setCurrentWordIndex] = useState(-1);
-  const [isReady, setIsReady] = useState(false);
 
-  // Track word boundaries for highlighting
-  const [wordBoundaries, setWordBoundaries] = useState<number[]>([]);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const currentCharIndexRef = useRef(0);
 
-  // Initialize voices and browser support
+  // Timer-based highlight state (Google/remote voices only)
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const virtualStartRef = useRef(0);  // Date.now() - elapsed_when_timer_started
+  const pausedElapsedRef = useRef(0); // elapsed value captured at pause
+  const wordTimingsRef = useRef<number[]>([]);
+  const wordCharPositionsRef = useRef<number[]>([]);
+  const usingTimerRef = useRef(false);
+
+  const clearTimer = () => {
+    if (timerRef.current !== null) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  /**
+   * Start the interval-based word highlight ticker.
+   * startElapsed: how many ms into the timing sequence we already are.
+   */
+  const runTimer = (startElapsed = 0) => {
+    clearTimer();
+    virtualStartRef.current = Date.now() - startElapsed;
+
+    timerRef.current = setInterval(() => {
+      const elapsed = Date.now() - virtualStartRef.current;
+      const timings = wordTimingsRef.current;
+
+      let idx = -1;
+      for (let i = 0; i < timings.length; i++) {
+        if (elapsed >= timings[i]) idx = i;
+        else break;
+      }
+
+      if (idx >= 0) {
+        setCurrentWordIndex(idx);
+        if (idx < wordCharPositionsRef.current.length) {
+          currentCharIndexRef.current = wordCharPositionsRef.current[idx];
+        }
+      }
+
+      // Auto-stop after all words are done
+      if (timings.length > 0 && elapsed > timings[timings.length - 1] + 2000) {
+        clearTimer();
+      }
+    }, 50);
+  };
+
   useEffect(() => {
-    const checkSupport = () => {
-      if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-        setIsSupported(true);
-        return true;
-      }
-      setIsSupported(false);
-      setIsInitializing(false);
-      return false;
-    };
-
     const loadVoices = () => {
-      if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-        setIsInitializing(false);
-        return;
-      }
       const available = window.speechSynthesis.getVoices();
       setVoices(available);
       const defaultVoice = available.find(v => v.lang.startsWith('en')) ?? available[0] ?? null;
       setVoice(defaultVoice);
-      
-      if (available.length > 0) {
-        setIsInitializing(false);
-      }
     };
 
-    if (checkSupport()) {
-      loadVoices();
-      window.speechSynthesis.onvoiceschanged = loadVoices;
+    loadVoices();
+    window.speechSynthesis.onvoiceschanged = loadVoices;
 
-      const timeout = setTimeout(() => {
-        setIsInitializing(false);
-      }, 1500);
-
-      return () => {
-        if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-          window.speechSynthesis.onvoiceschanged = null;
-        }
-        clearTimeout(timeout);
-      };
-    }
+    return () => {
+      window.speechSynthesis.onvoiceschanged = null;
+      clearTimer();
+    };
   }, []);
 
-  // Pre-compute word boundaries when text changes
   useEffect(() => {
-    if (!text) {
-      setWordBoundaries([]);
-      return;
-    }
+    if (isPlaying) handleStart(currentCharIndexRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voice, speed]);
+
+  const handleStart = (startIndex = 0) => {
+    if (!text) return;
+    clearTimer();
+
+    const safeStart = typeof startIndex === 'number' && !isNaN(startIndex) ? startIndex : 0;
+    window.speechSynthesis.cancel();
 
     const words = text.split(/\s+/).filter(w => w.length > 0);
-    const boundaries: number[] = [];
+
+    // Pre-compute absolute char position for each word (needed for highlight + resume)
+    const charPositions: number[] = [];
     let charPos = 0;
-    
     for (const word of words) {
       const pos = text.indexOf(word, charPos);
-      boundaries.push(pos);
+      charPositions.push(pos);
       charPos = pos + word.length;
     }
-    
-    setWordBoundaries(boundaries);
-  }, [text]);
+    wordCharPositionsRef.current = charPositions;
 
-  // Use the react-text-to-speech hook
-  const {
-    speechStatus,
-    start: startSpeech,
-    pause: pauseSpeech,
-    stop: stopSpeech,
-  } = useSpeech({
-    text,
-    rate: speed,
-    voiceURI: voice?.voiceURI,
-    lang: voice?.lang,
-    highlightText: false, // We manage highlighting manually for better control
-    onBoundary: (event) => {
-      // Track word progress using boundary events
-      if (event.progress === 0) {
-        setCurrentWordIndex(-1);
-        setIsPaused(false);
-      } else if (event.progress === 100) {
-        setCurrentWordIndex(-1);
-        setIsPaused(false);
+    // Determine which word index we're resuming from
+    let startWordIdx = 0;
+    for (let i = 0; i < charPositions.length; i++) {
+      if (charPositions[i] >= safeStart) {
+        startWordIdx = i;
+        break;
       }
-    },
-    onStart: () => {
-      setIsPaused(false);
-      setIsReady(true);
-    },
-    onPause: () => {
-      setIsPaused(true);
-    },
-    onResume: () => {
-      setIsPaused(false);
-    },
-    onStop: () => {
-      setCurrentWordIndex(-1);
-      setIsPaused(false);
-      setIsReady(false);
-    },
-    maxChunkSize: 1000, // Support long texts by chunking
-  });
+      startWordIdx = i + 1;
+    }
+    if (startWordIdx >= words.length) startWordIdx = 0;
 
-  // Map speechStatus to isPlaying
-  const isPlaying = speechStatus === 'started';
+    const remainingText = text.substring(safeStart);
+    const utterance = new SpeechSynthesisUtterance(remainingText);
+    if (voice) utterance.voice = voice;
+    utterance.rate = speed;
 
-  // Track word highlighting based on speech progress
-  useEffect(() => {
-    if (!isPlaying || wordBoundaries.length === 0) {
-      return;
+    const useTimer = isRemoteVoice(voice);
+    usingTimerRef.current = useTimer;
+
+    if (useTimer) {
+      const timings = buildWordTimings(words, speed);
+      wordTimingsRef.current = timings;
+
+      // When audio starts, jump the timer cursor to the correct word position.
+      // runTimer(timings[startWordIdx]) means elapsed = timings[startWordIdx] right now,
+      // so word startWordIdx highlights immediately, then advances on schedule.
+      utterance.onstart = () => {
+        runTimer(timings[startWordIdx] ?? 0);
+      };
+    } else {
+      // Native voices: use accurate onboundary events
+      utterance.onboundary = (event) => {
+        if (event.name !== 'word') return;
+
+        const absoluteCharIdx = safeStart + event.charIndex;
+        currentCharIndexRef.current = absoluteCharIdx;
+
+        let foundIdx = -1;
+        for (let i = 0; i < charPositions.length; i++) {
+          if (charPositions[i] <= absoluteCharIdx) foundIdx = i;
+        }
+        if (foundIdx !== -1) setCurrentWordIndex(foundIdx);
+      };
     }
 
-    // Use a timer to estimate word progress for now
-    // This is a simple implementation that works for most voices
-    const words = text.split(/\s+/).filter(w => w.length > 0);
-    const avgWordDuration = 60000 / (180 * speed); // ~180 WPM average reading speed
-    let currentIndex = 0;
+    utterance.onend = () => {
+      clearTimer();
+      setIsPlaying(false);
+      setCurrentWordIndex(-1);
+      currentCharIndexRef.current = 0;
+      pausedElapsedRef.current = 0;
+    };
 
-    const interval = setInterval(() => {
-      if (currentIndex < words.length && isPlaying && !isPaused) {
-        setCurrentWordIndex(currentIndex);
-        currentIndex++;
-      } else if (currentIndex >= words.length) {
-        clearInterval(interval);
-      }
-    }, avgWordDuration);
+    utterance.onerror = (e) => {
+      // 'interrupted' fires when cancel() is called intentionally — not an error
+      if (e.error === 'interrupted') return;
+      clearTimer();
+      setIsPlaying(false);
+    };
 
-    return () => clearInterval(interval);
-  }, [isPlaying, isPaused, wordBoundaries.length, text, speed]);
-
-  const handleStart = () => {
-    if (!text || !isSupported) return;
-    setCurrentWordIndex(-1);
-    startSpeech();
+    utteranceRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+    setIsPlaying(true);
   };
 
   const handlePauseResume = () => {
-    if (!isSupported) return;
-    
-    if (isPaused) {
-      startSpeech(); // Resume
-    } else if (isPlaying) {
-      pauseSpeech();
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume();
+      setIsPlaying(true);
+      if (usingTimerRef.current) runTimer(pausedElapsedRef.current);
+    } else {
+      // Snapshot elapsed before stopping the timer
+      pausedElapsedRef.current = Date.now() - virtualStartRef.current;
+      clearTimer();
+      window.speechSynthesis.pause();
+      setIsPlaying(false);
     }
   };
 
   const handleStop = () => {
-    if (!isSupported) return;
-    stopSpeech();
-    setCurrentWordIndex(-1);
-    setIsPaused(false);
+    clearTimer();
+    window.speechSynthesis.cancel();
+    setIsPlaying(false);
+    setCurrentWordIndex(0);
+    currentCharIndexRef.current = 0;
+    pausedElapsedRef.current = 0;
   };
 
-  // Keyboard shortcuts
   useHotkeys('shift+enter', () => {
     if (text && !isPlaying) handleStart();
   }, { enableOnFormTags: false });
@@ -193,9 +211,6 @@ export const useShadowing = () => {
     voice,
     setVoice,
     voices,
-    isSupported,
-    isInitializing,
-    isPaused,
     handleStart,
     handlePauseResume,
     handleStop,
